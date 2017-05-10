@@ -24,7 +24,7 @@ class RecoverTaskFromMesos(object):
         username=config.MARATHON_USER, 
         password=config.MARATHON_PASSWD
       )
-    self.running_tasks = self.api.get_framework_tasks()
+    self.running_tasks = self.api.get_framework_app_tasks()
     self.marathon_apps = self.get_all_apps()
 
   def get_all_apps(self):
@@ -57,7 +57,7 @@ class RecoverTaskFromMesos(object):
     return [self._recover_app_from_mesos(app, constraint) for app in apps]
 
   def recover_pypy_tasks(self):
-    apps = self.get_apps_by_tag("pypy_")
+    apps = self.get_apps_by_tag("pypy")
     constraint = MarathonConstraint("name", "LIKE", "worker")
     return [self._recover_app_from_mesos(app, constraint) for app in apps]
 
@@ -77,9 +77,9 @@ class RecoverTaskFromMesos(object):
       task = tasks[0]
       constraint = MarathonConstraint("name", "LIKE", "worker") if constraint is None else constraint
       
-      volumes = task["container"]["volumes"]
+      volumes = task["container"].get("volumes", None)
       app_volumes = []
-      if len(volumes) > 0:
+      if volumes and len(volumes) > 0:
         app_volumes = [MarathonContainerVolume(**v) for v in volumes]
 
       container = MarathonContainer(
@@ -103,10 +103,68 @@ class RecoverTaskFromMesos(object):
           app.labels = labels
       return self.marathon_api.create_app(name, app)
 
+  def update_pypy_env(self):
+        app_envs = {
+        "/pypy/ad-dsp-nginx": {
+            "env": {
+                "CONF": "/home/work/online/ad_dsp-slog.yml"
+            }
+        },
+        "/pypy/ad-py-nginx": {
+            "env": {
+                "CONF": "/home/work/online/ad_py-slog.conf"
+            }
+        },
+        "/pypy/adpc-nginx-slog": {
+            "env": {
+                "CONF": "/home/work/online/ad_adpc_slog.conf"
+            }
+        },
+        "/pypy/as-nginx": {
+            "env": {
+                "CONF": "/home/work/online/as_nginx-slog.conf"
+            }
+        },
+        "/pypy/kafka-metric": {
+            "env": {
+                "CONF": "/home/work/online/kafka_metric-slog.conf"
+            }
+        },
+        "/pypy/mpp-static-log-report": {
+            "env": {
+                "CONF": "/home/work/online/static_log_report-slog.yml"
+            }
+        },
+        "/pypy/mpperror-slog": {
+            "env": {
+                "CONF": "/home/work/online/mpperror_rate-slog.yml"
+            }
+        },
+        "/pypy/odin-nginx": {
+            "env": {
+                "CONF": "/home/work/online/odin_online.conf"
+            }
+        },
+        "/pypy/odin-ott-slog": {
+            "env": {
+                "CONF": "/home/work/online/ott_odin_rate-slog.yml",
+                "QUERY_SPAN": "60"
+            }
+        }
+    }
+    for app, conf in app_envs.iteritems():
+        if "env" in conf:
+            self.marathon_api.update_env(app, conf["env"])
+
+  def update_all_pypy_image(self):
+    pass
+
   def do(self):
     # logger.info(self.get_all_apps())
-    # self.recover_cadvisor()
-    self.recover_marathon_lb()
+    self.recover_cadvisor()
+    # self.recover_marathon_lb()
+    # self.recover_logstash_tasks()
+    # self.recover_pypy_tasks()
 
 
 if __name__ == '__main__':

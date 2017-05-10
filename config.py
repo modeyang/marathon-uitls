@@ -4,7 +4,7 @@
 import os
 import logging
 
-DEBUG = True
+DEBUG = False
 log_format="%(asctime)s %(filename)s [funcname:%(funcName)s] [line:%(lineno)d] %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO if not DEBUG else logging.DEBUG, format=log_format)
 
@@ -21,5 +21,5 @@ MAX_FILE_TIMEOUT = 3600 * 60
 
 try:
     from local_settings import *
-except:
+except Exception, e:
     pass
