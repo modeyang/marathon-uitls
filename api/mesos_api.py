@@ -12,6 +12,8 @@ import collections
 
 logger = logging.getLogger("mesos")
 
+Agent = collections.namedtuple("agent", ["id", "hostname"])
+
 # delete framework
 # curl -XPOST http://localhost:5050/master/teardown -d 'frameworkId=af404bcf-df0d-4f29-b542-adc635031512-0002'
 def dump_state(file_path):
@@ -102,6 +104,11 @@ class MesosHelper(object):
         for t in tasks:
             app_map[t["name"]].append(t)
         return app_map
+
+    def agents(self):
+        rjson = self.state()
+        slaves = rjson["slaves"]
+        return [Agent(id=s["id"], hostname=s["hostname"]) for s in slaves]
 
 
 if __name__ == '__main__':
