@@ -5,7 +5,7 @@ import marathon
 import config
 import mesos_api
 import logging
-import lib_util
+import utils.lib_util
 from marathon.models import *
 from marathon.models.container import MarathonContainer, MarathonContainerVolume
 
@@ -16,7 +16,7 @@ class MarathonHelper(object):
 
     def __init__(self, marathon_uri=config.MARATHON_URI, **kwargs):
         self.client = marathon.MarathonClient(marathon_uri, **kwargs)
-        self.proxy = lib_util.APIProxy(self.client)
+        self.proxy = utils.lib_util.APIProxy(self.client)
 
     def __getattr__(self, name):
         return getattr(self.proxy, name)
