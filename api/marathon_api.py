@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import sys
+sys.path.append("..")
+
 import marathon
 import config
 import mesos_api
 import logging
 import utils.lib_util
-from marathon.models import *
+from marathon.models import MarathonConstraint
 from marathon.models.container import MarathonContainer, MarathonContainerVolume
 
 logger = logging.getLogger(__name__)
@@ -62,4 +65,4 @@ class MarathonHelper(object):
 
 if __name__ == '__main__':
     helper = MarathonHelper(username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
-    pass
+    print helper.list_endpoints()

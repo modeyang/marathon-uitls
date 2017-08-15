@@ -1,84 +1,92 @@
 #!/usr/bin/env python
-import logging
 import sys
+sys.path.append("..")
 
-import boto.ec2.autoscale
+import os
+import yaml
+import logging
 import requests
+import config
+import burrow
+import marathon_api
+import collections
 
 
 logger = logging.getLogger(__name__)
 
 
-class MesosReporter():
-    def __init__(self, mesos_url):
-        self.mesos_url = mesos_url.rstrip('/')
-        stats_url = '/'.join([self.mesos_url, '/stats.json'])
-        self._state = requests.get(stats_url).json()
+class KafkaConsumerReporter(object):
+    def __init__(self, url, **kwargs):
+        """
+        url: burrow api addr
+        kwargs: pair of topic and consumer group
+        """
+        self.kwargs = kwargs
+        self.kafka_cluster = kwargs.pop("kafka_cluster", config.KAFKA_CLUSTER)
+        self.burrow_client = burrow.BurrowApi(url)
 
-    @property
-    def state(self):
-        return self._state
+    def consumer_state(self, group, topic=None):
+        c_lag = self.burrow_client.consumer_lag(self.kafka_cluster, group)
+        kafka_lag = burrow.KafkaConsumerLag(**c_lag)
+        return kafka_lag
 
 
-class MesosDecider():
-    def __init__(self, thresholds):
-        self.thresholds = thresholds
+class MarathonDecider(object):
+    def __init__(self, url=config.MARATHON_URI, **kwargs):
+        self.marathon_client = marathon_api.MarathonHelper(url, **kwargs)
 
-    def should_scale(self, cluster):
-        increment = 1
-        decrement = -1
+    def _get_task_count(self, app):
+        return len(self.marathon_client.list_tasks(app_id=app))
 
-        cpus_free = cluster.state['master/cpus_total'] - cluster.state['master/cpus_used']
-        disk_free = cluster.state['master/disk_total'] - cluster.state['master/disk_used']
-        mem_free = cluster.state['master/mem_total'] - cluster.state['master/mem_used']
-        logger.info('State: %s', dict(cpus_free=cpus_free, disk_free=disk_free, mem_free=mem_free))
-        logger.info('Thresholds: %s', self.thresholds)
+    def should_scale(self, **kwargs):
+        pass
 
-        if   (('cpus' in self.thresholds and cpus_free < self.thresholds['cpus']['lower']) or
-              ('disk' in self.thresholds and disk_free < self.thresholds['disk']['lower']) or
-              ('mem' in self.thresholds and mem_free < self.thresholds['mem']['lower'])):
-            scale_by = increment
-        elif (('cpus' in self.thresholds and cpus_free > self.thresholds['cpus']['upper']) or
-              ('disk' in self.thresholds and disk_free > self.thresholds['disk']['upper']) or
-              ('mem' in self.thresholds and mem_free > self.thresholds['mem']['upper'])):
-            scale_by = decrement
+    def scale(self, app, instances=None, delta=2):
+        logger.info("scale app: "+ app)
+        resp = None
+        if instances is not None:
+            resp = self.marathon_client.scale_app(app, instances=instances)
         else:
-            scale_by = 0
+            resp = self.marathon_client.scale_app(app, delta=delta)
+        return resp
 
-        logger.info('Should scale by %s', scale_by)
-        return scale_by
+    def do(self):
+        pass
 
 
-class AwsAsgScaler():
-    def __init__(self, region, asg_name, min_instances=1, max_instances=None, 
-                 aws_access_key_id=None, aws_secret_access_key=None):
-        self.region = region
-        self.asg_name = asg_name
-        self.min_instances = min_instances
-        self.max_instances = max_instances
-        self.aws_access_key_id = aws_access_key_id
-        self.aws_secret_access_key = aws_secret_access_key
+class TopicMaratonDecider(MarathonDecider):
 
-    def _get_connection(self):
-        if self.aws_access_key_id and self.aws_secret_access_key:
-            return boto.ec2.autoscale.connect_to_region(
-                self.region, 
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key)
-        else:
-            return boto.ec2.autoscale.connect_to_region(self.region)
-
-    def scale(self, delta):
-        c = self._get_connection()
-        current_count = c.get_all_groups(names=[self.asg_name])[0].desired_capacity
-        logger.info("Current scale: %s", current_count)
-        new_count = current_count + delta
+    def __init__(self, topic_cfg, marathon_url=config.MARATHON_URI, burrow_url=config.BURROW_URI, **kwargs):
+        self.kafka_reporter = KafkaConsumerReporter(burrow_url)
+        self.topic_cfg = topic_cfg
+        logger.info(self.topic_cfg)
+        super(TopicMaratonDecider, self).__init__(marathon_url, **kwargs)
         
-        if self.min_instances and new_count < self.min_instances:
-            new_count = self.min_instances
-        elif self.max_instances and new_count > self.max_instances:
-            new_count = self.max_instances
+    def should_scale(self, **kwargs):
+        cs_lag = kwargs.pop("cs_lag", None)
+        if cs_lag is None:
+            return False
+        if cs_lag.totallag > self.topic_cfg["threshold"] and cs_lag.partition_count > self._get_task_count(self.topic_cfg["app"]): 
+            return True
+        return False
 
-        if new_count != current_count:
-            logger.info("Scaling to %s", new_count)
-            c.set_desired_capacity(self.asg_name, new_count)
+    def do(self):
+        cs_lag = self.kafka_reporter.consumer_state(self.topic_cfg["group"])
+        if self.should_scale(cs_lag=cs_lag):
+            self.scale(self.topic_cfg["app"])
+
+
+class DeciderManager(object):
+    def __init__(self, **kwargs):
+        config_file = kwargs.pop("kafka_config_file", config.KAFKA_CONFIG_FILE)
+        kafka_config_path = os.path.join(config.BASE_PATH, "confs/" + config_file)
+        cs_config = yaml.load(open(kafka_config_path, "rb"))
+        self.deciders = [ TopicMaratonDecider(topic_cfg, username=config.MARATHON_USER, password=config.MARATHON_PASSWD) for topic_cfg in cs_config["topics"]]
+
+    def make_descide(self):
+        map(lambda x: x.do(), self.deciders)
+
+
+if __name__ == "__main__":
+    d = DeciderManager()
+    d.make_descide()

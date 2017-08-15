@@ -1,0 +1,32 @@
+---
+
+cluster: yg_kafka
+topics:
+  - topic: error_mobile
+    group: mpperror_logstash
+    threshold: 2000000
+    app: /logstash/mpperror-online
+  - topic: ad_adpc_nginx
+    group: ad_adpc_nginx-logstash
+    threshold: 2000000
+    app: /logstash/ad-adpc-error
+  - topic: ott_epg_nginx-access
+    group: ott_epg_nginx-access-logstash
+    threshold: 20000000
+    app: /logstash/ott-nginx
+  - topic: as_app
+    group: as_app-logstash
+    threshold: 2000000
+    app: /logstash/as-app
+  - topic: as_nginx-access
+    group: as_nginx-access-logstash
+    threshold: 2000000
+    app: /logstash/as-nginx
+  - topic: passport_app
+    group: passport_app-logstash
+    threshold: 2000000
+    app: /logstash/passport-app-online
+  - topic: passport_nginx-access
+    group: passport_nginx-access-logstash
+    threshold: 2000000
+    app: /logstash/passport-nginx

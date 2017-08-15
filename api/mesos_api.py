@@ -72,7 +72,7 @@ class MesosHelper(object):
 
     @dump_state("state.json")
     def state(self):
-        return self._do_request("GET", "/metrics/state")
+        return self._do_request("GET", "/master/state.json")
 
     def frameworks(self, **filter_kwargs):
         rjson = self.state()

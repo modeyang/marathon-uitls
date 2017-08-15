@@ -1,4 +1,8 @@
 requests
 marathon
-boto
-docker
+docker-2.0.0
+envtpl
+PyYAML
+kazoo
+kafka-python
+click

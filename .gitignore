@@ -89,3 +89,4 @@ ENV/
 .ropeproject
 local_settings.py
 noops
+state.json
