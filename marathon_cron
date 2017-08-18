@@ -1,0 +1,3 @@
+# !/bin/bash
+
+cd /root/projects/marathon-utils && python manager.py

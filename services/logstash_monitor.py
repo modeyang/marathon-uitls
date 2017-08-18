@@ -9,6 +9,7 @@ import logging
 import collections
 import config
 from api.marathon_api import MarathonHelper
+from api.burrow import BurrowApi
 from utils.zk_util import ZKHelper
 
 logger = logging.getLogger(__file__)
@@ -21,15 +22,18 @@ class LogstashMonitor(object):
         config_file = kwargs.pop("kafka_config_file", config.KAFKA_CONFIG_FILE)
         kafka_config_path = os.path.join(config.BASE_PATH, "confs/" + config_file)
         self.cs_config = yaml.load(open(kafka_config_path, "rb"))
+        self.kafka_cluster = self.cs_config["cluster"]
         self.marathon_client = MarathonHelper(config.MARATHON_URI, username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
-        self.zk_helper = ZKHelper(config.KAFKA_ZK) 
+        self.burrow_client = BurrowApi(config.BURROW_URI)
+        self.zk_helper = ZKHelper(config.KAFKA_ZK)
 
     def _extract_host(self, hostname):
         m = self.ip_pattern.search(hostname)
         if m is None:
             logger.error("regex hostname: %s failed, pattern:%s" % (hostname, self.ip_pattern.pattern))
             return None
-        return m.group(1)
+        ip = m.group(1)
+        return ip.replace("-", ".")
 
     def _check_lack_hosts(self, zk_cs_host, task_hosts):
         lack_hosts = []
@@ -43,7 +47,9 @@ class LogstashMonitor(object):
 
     def _check_topic(self, topic_cfg):
         logger.info(topic_cfg)
-        zk_consumers = self.zk_helper.get_consumers(topic_cfg["group"])
+        logger.debug(json.dumps(self.burrow_client.consumer_lag_json(self.kafka_cluster, topic_cfg["group"]), indent=2))
+
+        zk_consumers = self.zk_helper.get_consumers(topic_cfg["group"], topic_cfg["topic"])
         consumers = [self._extract_host(cs) for cs in zk_consumers]
         consumers = filter(lambda x: x is not None, consumers)
 
@@ -53,10 +59,11 @@ class LogstashMonitor(object):
 
         lack_hosts = self._check_lack_hosts(collections.Counter(consumers), collections.Counter([t.host for t in tasks ]))
         kill_tasks = []
-        map(lambda h: kill_tasks + host_task_dict[h], lack_hosts)
+        for h in lack_hosts:
+            kill_tasks += host_task_dict[h]
 
         logger.info("need kill tasks %s" % kill_tasks )
-        self.marathon_client.kill_given_tasks(kill_tasks)
+        return self.marathon_client.kill_given_tasks(kill_tasks, force=True)
 
     def check(self):
         for topic_cfg in self.cs_config["topics"]:

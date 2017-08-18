@@ -104,6 +104,19 @@ class BurrowApi(object):
         rjson = self._do_request(url, "GET").json()
         return rjson["status"]
 
+    def consumer_lag_json(self, cluster, grp):
+        lag_status = self.consumer_lag(cluster, grp)
+        kafka_lag = KafkaConsumerLag(**lag_status) 
+        partition_status = collections.Counter([ p["status"] for p in kafka_lag.partitions ]) 
+        consumer_status = {
+            "partition_status" : partition_status,
+            "status": kafka_lag.status,
+            "complete": kafka_lag.complete,
+            "partition_count": kafka_lag.partition_count,
+            "totallag": kafka_lag.totallag,
+        }
+        return consumer_status
+
     def topic_offset(self, cluster, topic):
         url = urlparse.urljoin(self.addr, "/v2/kafka/{0}/topic/{1}".format(cluster, topic))
         rjson = self._do_request(url, "GET").json()

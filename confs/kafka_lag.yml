@@ -30,3 +30,7 @@ topics:
     group: passport_nginx-access-logstash
     threshold: 2000000
     app: /logstash/passport-nginx
+  - topic: ott_tvos_nginx-access
+    group: ott_tvos_nginx-access-logstash
+    threshold: 2000000
+    app: /logstash/ott-tvos-nginx

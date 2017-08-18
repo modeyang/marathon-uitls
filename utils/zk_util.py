@@ -41,9 +41,15 @@ class ZKHelper(object):
     def __getattr__(self, name):
         return getattr(self.proxy, name)
 
-    def get_consumers(self, group):
+    def get_consumer_ids(self, group):
         path = "/consumers/%s/ids" % group
         return self.zk_client.get_children(path)
+
+    def get_consumers(self, group, topic):
+        path = "/consumers/%s/owners/%s" % (group, topic)
+        ids = self.zk_client.get_children(path)
+        consumers = [ self.zk_client.get(path + "/" + p)[0] for p in ids]
+        return list(set(consumers))
 
     def remove_unuse_logstash_consumer(self):
         consumer_path = "/consumers/"
