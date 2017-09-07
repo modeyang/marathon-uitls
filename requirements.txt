@@ -7,3 +7,4 @@ kazoo
 kafka-python
 click
 influxdb
+apscheduler

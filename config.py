@@ -33,6 +33,7 @@ DEFAULT_KAFKA_TIMEOUT = int(os.getenv("KAFKA_TIMEOUT", 10))
 DEFAULT_ZK_TIMEOUT = int(os.getenv("ZK_TIMEOUT", 5)) 
 
 INFLUXDB_DSN = os.getenv("INFLUXDB_DSN", "influxdb://localhost:8086/")
+MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", 60))
 
 try:
     from local_settings import *
