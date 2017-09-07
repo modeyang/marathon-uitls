@@ -104,6 +104,10 @@ class BurrowApi(object):
         rjson = self._do_request(url, "GET").json()
         return rjson["status"]
 
+    def consumer_lag_obj(self, cluster, grp):
+        lag_status = self.consumer_lag(cluster, grp)
+        return KafkaConsumerLag(**lag_status) 
+
     def consumer_lag_json(self, cluster, grp):
         lag_status = self.consumer_lag(cluster, grp)
         kafka_lag = KafkaConsumerLag(**lag_status) 
@@ -129,7 +133,7 @@ class BurrowApi(object):
         return rjson["topics"]
 
 if __name__ == '__main__':
-    client = BurrowApi("http://10.100.1.144:9000")
+    client = BurrowApi("http://localhost:9000")
     print client.health()
     # print client.topic_offset("yg_kafka", "rc_realtime_nginx-access")
     print client.delete_consumer("yg_kafka", "ad_adpc_nginx-logstash-access-test")

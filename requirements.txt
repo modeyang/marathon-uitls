@@ -1,8 +1,9 @@
 requests
 marathon
-docker-2.0.0
+docker==2.0.0
 envtpl
 PyYAML
 kazoo
 kafka-python
 click
+influxdb

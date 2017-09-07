@@ -1,2 +1,7 @@
 {
+    "files.exclude": {
+        "**/.git": true,         // this is a default value
+        "**/.DS_Store": true,    // this is a default value
+        "**/.env": true // this excludes all folders 
+    }
 }

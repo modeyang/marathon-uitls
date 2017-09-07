@@ -5,6 +5,7 @@ import os
 import re
 import json
 import yaml
+import time
 import logging
 import collections
 import config
@@ -45,11 +46,24 @@ class LogstashMonitor(object):
                 lack_hosts.append(host)
         return lack_hosts
 
+    def _get_zk_consumers(self, topic_cfg):
+        index = 3
+        while index > 0:
+            try:
+                zk_consumers = self.zk_helper.get_consumers(topic_cfg["group"], topic_cfg["topic"])
+                return zk_consumers
+            except Exception, e:
+                time.sleep(1)
+            index -= 1
+        return None
+
     def _check_topic(self, topic_cfg):
         logger.info(topic_cfg)
-        logger.debug(json.dumps(self.burrow_client.consumer_lag_json(self.kafka_cluster, topic_cfg["group"]), indent=2))
+        logger.info(json.dumps(self.burrow_client.consumer_lag_json(self.kafka_cluster, topic_cfg["group"]), indent=2))
 
-        zk_consumers = self.zk_helper.get_consumers(topic_cfg["group"], topic_cfg["topic"])
+        zk_consumers = self._get_zk_consumers(topic_cfg)
+        if zk_consumers is None:
+            return
         consumers = [self._extract_host(cs) for cs in zk_consumers]
         consumers = filter(lambda x: x is not None, consumers)
 

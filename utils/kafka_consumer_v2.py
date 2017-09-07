@@ -12,6 +12,7 @@ from kafka import KafkaClient, KafkaConsumer
 from kafka.common import OffsetRequestPayload, TopicPartition
 from kazoo.client import KazooClient
 from kazoo.exceptions import NoNodeError
+from zk_util import ZKHelper
 
 import config
 
@@ -26,6 +27,7 @@ class KafkaCheck(object):
         self.collector = kwargs.pop("collector", None)
         self.zk_timeout = int(kwargs.get('zk_timeout', config.DEFAULT_ZK_TIMEOUT))
         self.kafka_timeout = int(kwargs.get('kafka_timeout', config.DEFAULT_KAFKA_TIMEOUT))
+        self.zk_client = kwargs.pop("zk_client", None)
 
     def read_config(self, instance, key, cast=None):
         if cast and callable(cast):
@@ -80,19 +82,12 @@ class KafkaCheck(object):
 
         return consumer_offsets
 
-    def _get_consumer_offset_by_zookeeper(self, zk_hosts, kafka_client, cm_config, zk_prefix=""):
+    def _get_consumer_offset_by_zookeeper(self, zk_conn, kafka_client, cm_config, zk_prefix=""):
         # Connect to Zookeeper
-        zk_conn = KazooClient(zk_hosts, timeout=self.zk_timeout)
-        zk_conn.start()
-
         try:
             consumer_offsets = self._get_offsets_based_on_config(kafka_client, zk_conn, zk_prefix, cm_config)
-        finally:
-            try:
-                zk_conn.stop()
-                zk_conn.close()
-            except Exception:
-                logger.exception('Error cleaning up Zookeeper connection')
+        except Exception, e:
+            logger.exception(e)
 
         try:
             broker_offsets = {}
@@ -148,10 +143,11 @@ class KafkaCheck(object):
         # Construct the Zookeeper path pattern
         cm = {"topic": topic, "group": consumer_group, "zk_enabled": zk_enabled}
         if cm.get("zk_enabled", True):
-            pcm = self._get_consumer_offset_by_zookeeper(config.KAFKA_ZK, kafka_conn, cm, zk_prefix)
+            zk_client = self.zk_client if self.zk_client else ZKHelper(config.KAFKA_ZK)
+            pcm = self._get_consumer_offset_by_zookeeper(zk_client, kafka_conn, cm, zk_prefix)
         else:
             pcm = self._get_consumer_offset_by_api(kafka_conn, cm, config.KAFKA_SERVERS)
-        print pcm.consumer_lag
+        return pcm.consumer_lag
 
     def _check(self, instance):
         """
