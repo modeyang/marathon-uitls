@@ -94,22 +94,35 @@ class BurrowApi(object):
         rjson = self._do_request(url, "GET").json()
         return rjson["offsets"]
 
-    def consumer_status(self, cluster, grp):
+    def _consumer_topic_status(self, json_status, topic=None):
+        if topic is None:
+            return json_status
+        topic_pats = [ tp for tp in json_status["partitions"] if tp["topic"] == topic ]
+        status = all(map(lambda x: x["status"] == 'OK', topic_pats))
+        json_status["status"] = "ERR" if not status else "OK"
+        json_status["complete"] = status
+        json_status["totallag"] = sum([ tp["end"]["lag"] for tp in topic_pats ])
+        json_status["partition_count"] = len(topic_pats)
+        json_status["partitions"] = topic_pats
+        json_status["maxlag"] = sorted(topic_pats, key=lambda x: x["end"]["lag"], reverse=True)[0]
+        return json_status
+
+    def consumer_status(self, cluster, grp, topic=None):
         url = urlparse.urljoin(self.addr, "/v2/kafka/{0}/consumer/{1}/status".format(cluster, grp))
         rjson = self._do_request(url, "GET").json()
-        return rjson["status"]
+        return self._consumer_topic_status(rjson["status"], topic)
 
-    def consumer_lag(self, cluster, grp):
+    def consumer_lag(self, cluster, grp, topic=None):
         url = urlparse.urljoin(self.addr, "/v2/kafka/{0}/consumer/{1}/lag".format(cluster, grp))
         rjson = self._do_request(url, "GET").json()
-        return rjson["status"]
+        return self._consumer_topic_status(rjson["status"], topic)
 
-    def consumer_lag_obj(self, cluster, grp):
-        lag_status = self.consumer_lag(cluster, grp)
+    def consumer_lag_obj(self, cluster, grp, topic=None):
+        lag_status = self.consumer_lag(cluster, grp, topic)
         return KafkaConsumerLag(**lag_status) 
 
-    def consumer_lag_json(self, cluster, grp):
-        lag_status = self.consumer_lag(cluster, grp)
+    def consumer_lag_json(self, cluster, grp, topic=None):
+        lag_status = self.consumer_lag(cluster, grp, topic)
         kafka_lag = KafkaConsumerLag(**lag_status) 
         partition_status = collections.Counter([ p["status"] for p in kafka_lag.partitions ]) 
         consumer_status = {
@@ -133,7 +146,6 @@ class BurrowApi(object):
         return rjson["topics"]
 
 if __name__ == '__main__':
-    client = BurrowApi("http://localhost:9000")
-    print client.health()
-    # print client.topic_offset("yg_kafka", "rc_realtime_nginx-access")
-    print client.delete_consumer("yg_kafka", "ad_adpc_nginx-logstash-access-test")
+    import json
+    client = BurrowApi("http://127.0.0.1:9000")
+    print json.dumps(client.consumer_lag("yg_kafka", "hangout", "new_app_error"), indent=2)
