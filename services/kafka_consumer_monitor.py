@@ -41,16 +41,29 @@ class KafkaConsumerMonitor(object):
                     self.zk_helper.delete(del_path, recursive=True)
         return groups
 
+    def get_avaliable_consumers_by_api(self):
+        groups = []
+        consumers = self.burrow.consumers(config.KAFKA_CLUSTER)
+        for grp in consumers:
+            try:
+                c_lag = self.burrow.consumer_lag_obj(config.KAFKA_CLUSTER, grp)
+                if c_lag.complete: groups.append(c_lag)
+            except Exception as e:
+                logger.error("%s catch error: %s" % (grp, e))
+        return groups
+
     def check(self):
         metric_dict = {}
-        use_grps = self.get_avaliable_consumers()
+        # use_grps = self.get_avaliable_consumers()
+        use_grps = self.get_avaliable_consumers_by_api()
+        zk_consumers = self.zk_helper.get_children("/consumers")
         metric = "kafka.consumerLag"
         threads = []
         for clag in use_grps:
             grp = clag.group
             topics = self.burrow.consumer_topics(config.KAFKA_CLUSTER, grp)
             for tp in topics:
-                if clag.status == "ERR":
+                if clag.status == "ERR" and grp in zk_consumers:
                     lag = self.kafka_helper.get_topic_consumer_lag(grp, tp)
                 else:
                     lag = clag.totallag
