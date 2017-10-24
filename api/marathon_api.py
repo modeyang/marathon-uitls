@@ -61,8 +61,16 @@ class MarathonHelper(object):
             app.env = env
             return self.client.update_app(id, app)
 
-
+    def scale_group_apps(self, include_apps=[], instances=0):
+        assert isinstance(include_apps, (list, tuple))
+        grps = self.client.list_groups()
+        for grp in grps:
+            for app in grp.apps:
+                if len(include_apps) > 0 and not all([ f in app.id for f in include_apps]):
+                    continue
+                # print app.id
+                self.client.scale_app(app.id, instances)
 
 if __name__ == '__main__':
     helper = MarathonHelper(username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
-    print helper.list_endpoints()
+    helper.scale_group_apps(["nginx"], instances=2)

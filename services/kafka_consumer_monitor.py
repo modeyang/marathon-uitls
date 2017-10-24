@@ -60,10 +60,15 @@ class KafkaConsumerMonitor(object):
         metric = "kafka.consumerLag"
         threads = []
         for clag in use_grps:
+            if all([(p["status"] == "STOP") for p in clag.partitions ]):
+                logger.info("error consumer group: %s, skip it" % clag.group)
+                continue
             grp = clag.group
             topics = self.burrow.consumer_topics(config.KAFKA_CLUSTER, grp)
             for tp in topics:
-                if clag.status == "ERR" and grp in zk_consumers:
+                if clag.status == "ERR" and grp not in zk_consumers:
+                    continue
+                elif grp in zk_consumers:
                     lag = self.kafka_helper.get_topic_consumer_lag(grp, tp)
                 else:
                     lag = clag.totallag

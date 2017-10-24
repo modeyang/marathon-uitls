@@ -104,8 +104,11 @@ class KafkaCheck(object):
             logger.exception(e)
 
         consumer_lags = 0
-        for key in broker_offsets.keys():
-            consumer_lags += broker_offsets[key] - consumer_offsets[key]
+        try:
+            for key in broker_offsets.keys():
+                consumer_lags += broker_offsets[key] - consumer_offsets[key]
+        except Exception as e:
+            consumer_lags = 0
         return ConsumerLag(topic, group_id, consumer_lags)
 
     def handle_collector(self, consumer_lags, collector, cluster_name):
