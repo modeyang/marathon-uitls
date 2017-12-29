@@ -4,15 +4,31 @@
 import sys
 sys.path.append("..")
 
+import os
 import marathon
 import config
 import mesos_api
 import logging
+import json
 import utils.lib_util
 from marathon.models import MarathonConstraint
 from marathon.models.container import MarathonContainer, MarathonContainerVolume
 
 logger = logging.getLogger(__name__)
+
+APP_STATUS_FILE = os.path.join(config.BASE_PATH, "app_status.json")
+
+def save_metrics(file_path):
+    def _save(func):
+        def __decorator(*args, **kwargs):
+            rjson = func(*args, **kwargs)
+            if rjson is None:
+                return None
+            with open(file_path, "a") as f:
+                f.write(rjson + "\n")
+            return rjson
+        return __decorator
+    return _save
 
 
 class MarathonHelper(object):
@@ -71,6 +87,22 @@ class MarathonHelper(object):
                 # print app.id
                 self.client.scale_app(app.id, instances)
 
+    @save_metrics(APP_STATUS_FILE)
+    def pause_groups(self, groups=[]):
+        app_status = {}
+        grps = self.client.list_groups()
+        filter_grps = [ grp for grp in grps if grp.id in groups ] 
+        for grp in filter_grps:
+            for app in grp.apps:
+                app_status[app.id] = app.instances
+                # self.client.scale_app(app.id, 0)
+        return json.dumps(app_status)
+
+    def restore_apps(self, file_path=APP_STATUS_FILE):
+        app_status = json.loads(open(file_path, "r").read())
+        for app_id, instances in app_status.iteritems():
+            self.client.scale_app(app_id, instances)
+
+
 if __name__ == '__main__':
     helper = MarathonHelper(username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
-    helper.scale_group_apps(["nginx"], instances=2)

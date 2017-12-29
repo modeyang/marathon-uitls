@@ -98,6 +98,8 @@ class BurrowApi(object):
         if topic is None:
             return json_status
         topic_pats = [ tp for tp in json_status["partitions"] if tp["topic"] == topic ]
+        if len(topic_pats) == 0:
+            return None
         status = all(map(lambda x: x["status"] == 'OK', topic_pats))
         json_status["status"] = "ERR" if not status else "OK"
         json_status["complete"] = status
