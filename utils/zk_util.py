@@ -63,6 +63,21 @@ class ZKHelper(object):
                     cs_path = consumer_path + cs
                     self.zk_client.delete(cs_path, recursive=True)
             except NoNodeError, e:
+                logger.info("no ids in path: " + id_path)
                 pass
             except Exception, e:
                 logger.error(e)
+
+    def remove_invalid_consumers(self):
+        consumer_path = "/consumers/"
+        consumers = self.zk_client.get_children(consumer_path)
+        for cs in consumers:
+            id_path = consumer_path + "%s/ids/" % cs
+            try:
+                ids = self.zk_client.get_children(id_path)
+            except NoNodeError, e:
+                logger.info("no ids in path: " + id_path + ", remove it")
+                self.zk_client.delete(consumer_path + cs, recursive=True)
+            except Exception, e:
+                logger.error(e)
+

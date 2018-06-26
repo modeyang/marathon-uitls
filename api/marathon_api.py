@@ -24,7 +24,7 @@ def save_metrics(file_path):
             rjson = func(*args, **kwargs)
             if rjson is None:
                 return None
-            with open(file_path, "a") as f:
+            with open(file_path, "w") as f:
                 f.write(rjson + "\n")
             return rjson
         return __decorator
@@ -88,21 +88,36 @@ class MarathonHelper(object):
                 self.client.scale_app(app.id, instances)
 
     @save_metrics(APP_STATUS_FILE)
-    def pause_groups(self, groups=[]):
+    def pause_groups(self, groups=[], **kwargs):
+        filter_apps = ["nginx", "packet", "sla", "playhistory_app", "audit"]
+        # filter_apps = ["nginx", "packet", "sla"]
+
+        def is_filter_app(appid, filters):
+            for f in filters:
+                if f in appid:
+                    return True
+            return False
+
         app_status = {}
         grps = self.client.list_groups()
         filter_grps = [ grp for grp in grps if grp.id in groups ] 
         for grp in filter_grps:
             for app in grp.apps:
-                app_status[app.id] = app.instances
-                # self.client.scale_app(app.id, 0)
+                if is_filter_app(app.id, filter_apps):
+                    app_status[app.id] = app.instances
+                    self.client.scale_app(app.id, 0)
         return json.dumps(app_status)
 
-    def restore_apps(self, file_path=APP_STATUS_FILE):
+    def restore_apps(self, file_path=APP_STATUS_FILE, instances=1):
         app_status = json.loads(open(file_path, "r").read())
         for app_id, instances in app_status.iteritems():
-            self.client.scale_app(app_id, instances)
+            try:
+                self.client.scale_app(app_id, instances)
+            except Exception, e:
+                print e
 
 
 if __name__ == '__main__':
     helper = MarathonHelper(username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
+    # helper.pause_groups(["/hangout", "/logstash"])
+    helper.restore_apps()

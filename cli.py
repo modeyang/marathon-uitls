@@ -5,11 +5,13 @@
 import fire
 import config
 from api.marathon_api import MarathonHelper
+from utils.zk_util import ZKHelper
 
 
 class MarathonCli(object):
     def __init__(self):
         self.api = MarathonHelper(username=config.MARATHON_USER, password=config.MARATHON_PASSWD)
+        self.zkClient = ZKHelper(config.KAFKA_ZK) 
 
     def group(self, action, groups="/logstash,/hangout"):
         assert action in ["pause", "start"]
@@ -21,6 +23,9 @@ class MarathonCli(object):
 
     def app(self, apps, action):
         assert action in ["pause", "start"]
+
+    def bulk_zk_rm(self):
+        self.zkClient.remove_invalid_consumers()
 
 
 if __name__ == '__main__':

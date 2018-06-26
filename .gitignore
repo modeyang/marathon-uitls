@@ -90,3 +90,4 @@ ENV/
 local_settings.py
 noops
 state.json
+app_status.json

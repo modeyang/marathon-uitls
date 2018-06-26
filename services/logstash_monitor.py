@@ -1,7 +1,10 @@
 # !/usr/bin/env python
 # coding=utf-8
 
+import sys
 import os
+sys.path.append("..")
+
 import re
 import json
 import yaml
@@ -82,3 +85,4 @@ class LogstashMonitor(object):
     def check(self):
         for topic_cfg in self.cs_config["topics"]:
             self._check_topic(topic_cfg)
+
