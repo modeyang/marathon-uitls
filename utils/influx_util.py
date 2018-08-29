@@ -14,7 +14,7 @@ class InfluxHelper(object):
     def __init__(self, database, **kwargs):
         dsn = kwargs.pop("dsn", config.INFLUXDB_DSN)
         uri = dsn + database
-        self.client = InfluxDBClient.from_DSN(uri)
+        self.client = InfluxDBClient.from_dsn(uri)
         self.client.create_database(database)
         self.client.switch_database(database)
     
